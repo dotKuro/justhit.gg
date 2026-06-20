@@ -1,0 +1,62 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+
+/* Class-based dark mode: `dark:` utilities apply when .dark is on an ancestor. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    sans-serif;
+}
+
+/* Semantic color tokens resolve to runtime vars (below) so they swap per theme.
+   `inline` makes utilities reference the var directly, e.g. bg-bg -> var(--bg). */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+}
+
+@layer base {
+  /* Light theme (default for no-JS is forced dark via the html class). */
+  :root {
+    --bg: #f6f7f9; /* soft off-white page */
+    --surface: #ffffff; /* cards lift to white */
+    --border: #e4e7ec;
+    --fg: #15171f;
+    --muted: #5b6172;
+    --accent: #d92d3a;
+    color-scheme: light;
+  }
+  .dark {
+    --bg: #0a0b10;
+    --surface: #14161f;
+    --border: #272b3a;
+    --fg: #e7e9ef;
+    --muted: #9aa0b4;
+    --accent: #ff4655;
+    color-scheme: dark;
+  }
+
+  html {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    scroll-behavior: smooth;
+  }
+  body {
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+  }
+}
+
+/* Prose for Markdown report bodies — retint links/quote borders to the accent
+   for both the light (prose) and dark (prose-invert) variants. */
+.prose-report {
+  --tw-prose-links: var(--color-accent);
+  --tw-prose-quote-borders: var(--color-accent);
+  --tw-prose-invert-links: var(--color-accent);
+  --tw-prose-invert-quote-borders: var(--color-accent);
+}

@@ -1,0 +1,38 @@
+---
+import { languages, defaultLang, type Lang } from '../i18n/ui';
+
+const current = (Astro.currentLocale as Lang) ?? defaultLang;
+// Swap the leading /<locale> segment so the link points at the same page.
+const rest = Astro.url.pathname.replace(/^\/(en|de)(?=\/|$)/, '') || '/';
+---
+
+<nav class="flex items-center gap-1 text-xs" aria-label="Language">
+  {
+    (Object.keys(languages) as Lang[]).map((lang) => (
+      <a
+        href={`/${lang}${rest}`}
+        hreflang={lang}
+        data-lang-link
+        class:list={[
+          'rounded px-1.5 py-0.5 uppercase transition-colors',
+          lang === current ? 'font-semibold text-fg' : 'text-muted hover:text-fg',
+        ]}
+        aria-current={lang === current ? 'true' : undefined}
+      >
+        {lang}
+      </a>
+    ))
+  }
+</nav>
+
+<script>
+  // Carry the current query string (e.g. ?tag=...) and hash across a language
+  // switch, so active filters survive. Links are built statically, so we append
+  // the live search at click time.
+  document.querySelectorAll<HTMLAnchorElement>('[data-lang-link]').forEach((a) => {
+    const base = a.getAttribute('href') || '';
+    a.addEventListener('click', () => {
+      a.setAttribute('href', base + window.location.search + window.location.hash);
+    });
+  });
+</script>

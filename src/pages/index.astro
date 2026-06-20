@@ -1,0 +1,21 @@
+---
+// Static landing redirect to the default locale. Instant (0s refresh + JS),
+// since a static host serves this HTML directly. A server-level redirect can
+// be added in Caddy later for an even cleaner 301.
+const target = '/en/';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content={`0; url=${target}`} />
+    <link rel="canonical" href={target} />
+    <meta name="robots" content="noindex" />
+    <title>justhit.gg</title>
+    <script is:inline>window.location.replace('/en/');</script>
+  </head>
+  <body>
+    Redirecting to <a href={target}>justhit.gg</a>…
+  </body>
+</html>

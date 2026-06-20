@@ -1,0 +1,18 @@
+---
+import { Icons } from '@pkmn/img';
+
+interface Props {
+  /** Species name, e.g. "Espathra" or "Lopunny-Mega". */
+  species: string;
+}
+
+const { species } = Astro.props;
+const icon = Icons.getPokemon(species);
+---
+
+<span
+  class="not-prose mr-0.5 inline-block align-middle"
+  style={icon.style}
+  role="img"
+  aria-label={species}
+></span>

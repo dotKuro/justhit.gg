@@ -1,0 +1,176 @@
+---
+import { getCollection, type CollectionEntry } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PokemonIcon from '../../components/PokemonIcon.astro';
+import { teamIconSpecies } from '../../lib/pokepaste';
+import { useTranslations, dateLocale, languages, defaultLang, type Lang } from '../../i18n/ui';
+
+export function getStaticPaths() {
+  return (Object.keys(languages) as Lang[]).map((lang) => ({ params: { lang } }));
+}
+
+const lang = Astro.params.lang as Lang;
+const t = useTranslations(lang);
+
+// Group reports by slug, preferring the current language, falling back to default.
+const all = await getCollection('reports');
+const bySlug = new Map<string, Partial<Record<Lang, CollectionEntry<'reports'>>>>();
+for (const entry of all) {
+  const [loc, ...rest] = entry.id.split('/');
+  const slug = rest.join('/');
+  if (!bySlug.has(slug)) bySlug.set(slug, {});
+  bySlug.get(slug)![loc as Lang] = entry;
+}
+
+const reports = [...bySlug.entries()]
+  .map(([slug, locs]) => ({ slug, entry: locs[lang] ?? locs[defaultLang] }))
+  .filter((r): r is { slug: string; entry: CollectionEntry<'reports'> } => Boolean(r.entry))
+  .sort((a, b) => b.entry.data.publishDate.valueOf() - a.entry.data.publishDate.valueOf());
+
+// Resolve each report's headline team into a list of icon species (build-time).
+const cards = await Promise.all(
+  reports.map(async ({ slug, entry }) => ({
+    slug,
+    entry,
+    species: entry.data.paste ? await teamIconSpecies(entry.data.paste) : [],
+  })),
+);
+
+const fmtDate = (d: Date) =>
+  d.toLocaleDateString(dateLocale[lang], { year: 'numeric', month: 'long', day: 'numeric' });
+
+const tagsOf = (e: CollectionEntry<'reports'>) =>
+  [e.data.format, e.data.tier, e.data.placement, ...e.data.tags].filter(Boolean) as string[];
+---
+
+<BaseLayout lang={lang}>
+  <p class="pt-6 text-sm text-muted">{t('site.tagline')}</p>
+
+  <div class="mt-8 flex flex-wrap items-center gap-x-3 gap-y-2">
+    <h1 class="text-2xl font-bold tracking-tight">{t('home.latest')}</h1>
+    {/* Active filters render here (next to the heading), nudged to optical center. */}
+    <div id="active-filters" class="relative top-[4px] flex flex-wrap items-center gap-2 text-[11px]"></div>
+  </div>
+
+  {
+    cards.length === 0 ? (
+      <p class="mt-4 text-muted">{t('home.empty')}</p>
+    ) : (
+      <>
+        <ul id="report-list" class="mt-4 grid gap-4 pb-2">
+          {cards.map(({ slug, entry, species }) => (
+            <li data-report data-tags={tagsOf(entry).join('|')}>
+              <div class="rounded-xl border border-border bg-surface transition-colors hover:border-accent">
+                <a href={`/${lang}/reports/${slug}/`} class="block px-6 pt-5">
+                  {species.length > 0 && (
+                    <div class="mb-3 flex flex-wrap gap-0.5">
+                      {species.map((s) => (
+                        <PokemonIcon species={s} />
+                      ))}
+                    </div>
+                  )}
+                  <p class="text-lg font-semibold">{entry.data.title}</p>
+                  <p class="mt-1 text-sm text-muted">{entry.data.description}</p>
+                  <p class="mt-3 text-xs text-muted/70">{fmtDate(entry.data.publishDate)}</p>
+                </a>
+                <div class="flex flex-wrap gap-2 px-6 pb-5 pt-3 text-xs">
+                  {tagsOf(entry).map((tag) => (
+                    <button
+                      type="button"
+                      class="js-tag cursor-pointer rounded-full border border-border px-2 py-0.5 font-medium text-muted transition-colors hover:border-accent"
+                      data-tag={tag}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <p id="no-match" hidden class="mt-4 pb-12 text-muted">
+          {t('home.noMatch')}
+        </p>
+      </>
+    )
+  }
+</BaseLayout>
+
+<script>
+  const filters = new Set<string>();
+  const cards = [...document.querySelectorAll<HTMLElement>('[data-report]')];
+  const tagButtons = [...document.querySelectorAll<HTMLButtonElement>('.js-tag')];
+  const active = document.getElementById('active-filters');
+  const noMatch = document.getElementById('no-match');
+
+  const ACTIVE = ['border-accent', 'bg-accent', 'text-bg'];
+  const INACTIVE = ['border-border', 'text-muted', 'hover:border-accent'];
+
+  function paint(el: HTMLElement, on: boolean) {
+    el.classList.toggle('cursor-pointer', true);
+    if (on) {
+      el.classList.add(...ACTIVE);
+      el.classList.remove(...INACTIVE);
+    } else {
+      el.classList.add(...INACTIVE);
+      el.classList.remove(...ACTIVE);
+    }
+  }
+
+  function update() {
+    // Show a card only if it has every active tag (stacked = AND).
+    let visible = 0;
+    for (const card of cards) {
+      const tags = (card.dataset.tags || '').split('|');
+      const show = [...filters].every((f) => tags.includes(f));
+      card.hidden = !show;
+      if (show) visible++;
+    }
+    if (noMatch) noMatch.hidden = visible !== 0;
+
+    // Highlight every matching tag button across the cards.
+    for (const btn of tagButtons) paint(btn, filters.has(btn.dataset.tag || ''));
+
+    // Render the active filters next to the heading.
+    if (active) {
+      active.replaceChildren();
+      for (const f of filters) {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className =
+          'cursor-pointer rounded-full border border-accent bg-accent px-1.5 py-0.5 font-medium text-bg';
+        chip.textContent = `${f} ✕`;
+        chip.addEventListener('click', () => toggle(f));
+        active.appendChild(chip);
+      }
+    }
+
+    syncUrl();
+  }
+
+  function toggle(tag: string) {
+    if (filters.has(tag)) filters.delete(tag);
+    else filters.add(tag);
+    update();
+  }
+
+  // Reflect active filters in the URL (?tag=...), so a filtered view is
+  // shareable and survives a reload.
+  function syncUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('tag');
+    for (const f of filters) url.searchParams.append('tag', f);
+    history.replaceState(null, '', url);
+  }
+
+  for (const btn of tagButtons) {
+    btn.addEventListener('click', () => toggle(btn.dataset.tag || ''));
+  }
+
+  // Initialise from the URL on load. Unknown tags are kept too, so they show as
+  // a removable chip and surface the "no reports match" state.
+  for (const tag of new URL(window.location.href).searchParams.getAll('tag')) {
+    if (tag) filters.add(tag);
+  }
+  update();
+</script>

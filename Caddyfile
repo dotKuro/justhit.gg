@@ -1,0 +1,20 @@
+# Plain HTTP file server — TLS is terminated upstream (Cloud Run / load balancer
+# / reverse proxy). Binds to $PORT (Cloud Run injects it; defaults to 8080).
+{
+	admin off
+	auto_https off
+}
+
+:{$PORT:8080} {
+	root * /srv
+	encode zstd gzip
+
+	# Astro builds directory-style pages (…/index.html); file_server resolves
+	# those and trailing-slash redirects automatically.
+	file_server
+
+	# Fingerprinted bundles and self-hosted sprites are content-addressed and
+	# never change — cache them hard. (HTML stays uncached by default.)
+	@immutable path /_astro/* /sprites/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+}

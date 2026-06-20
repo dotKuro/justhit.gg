@@ -1,0 +1,206 @@
+---
+import { type PokemonSet } from '@pkmn/sets';
+import { Sprites, Icons } from '@pkmn/img';
+import { Dex } from '@pkmn/dex';
+import fs from 'node:fs';
+import path from 'node:path';
+import { useTranslations, defaultLang, type Lang } from '../i18n/ui';
+import { fetchPaste, parseTeam, resolveMega } from '../lib/pokepaste';
+
+const t = useTranslations((Astro.currentLocale as Lang) ?? defaultLang);
+
+const LOCAL_SPRITE_DIR = 'public/sprites/pokemon';
+
+/**
+ * Prefer our local animated HOME gif (named by Showdown sprite id) and fall
+ * back to the Showdown CDN when we don't have one (gmax, totems, cosmetics…).
+ * Resolution happens at build time, so the right URL is baked into the HTML.
+ */
+function spriteFor(species: string) {
+  const cdn = Sprites.getPokemon(species);
+  const id = decodeURIComponent(cdn.url.split('/').pop() ?? '').replace(
+    /\.(gif|png|webp)$/i,
+    '',
+  );
+  const local = id && fs.existsSync(path.resolve(LOCAL_SPRITE_DIR, `${id}.webp`));
+  return {
+    url: local ? `/sprites/pokemon/${id}.webp` : cdn.url,
+    // Local HOME renders are smooth; only the gen5 CDN fallback is pixel art.
+    pixelated: local ? false : cdn.pixelated,
+  };
+}
+
+const LOCAL_ITEM_DIR = 'public/sprites/items';
+
+/**
+ * Prefer our local non-pixelated Serebii item render; fall back to the Showdown
+ * pixel-sheet icon (returned as an inline style) for anything we don't have.
+ */
+function itemSpriteFor(item?: string) {
+  if (!item) return null;
+  const id = Dex.items.get(item).id || item.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (id && fs.existsSync(path.resolve(LOCAL_ITEM_DIR, `${id}.png`))) {
+    return { url: `/sprites/items/${id}.png`, style: null };
+  }
+  return { url: null, style: Icons.getItem(item).style };
+}
+
+interface Props {
+  /** A Poképaste / Showdown URL, e.g. https://pokepast.es/abc123 */
+  src?: string;
+  /** Or a raw Showdown export pasted directly. */
+  paste?: string;
+}
+
+const { src, paste } = Astro.props;
+
+const STAT_ORDER = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const;
+const STAT_LABEL: Record<(typeof STAT_ORDER)[number], string> = {
+  hp: 'HP',
+  atk: 'Atk',
+  def: 'Def',
+  spa: 'SpA',
+  spd: 'SpD',
+  spe: 'Spe',
+};
+
+const text = paste ?? (src ? await fetchPaste(src) : null);
+const sets: Partial<PokemonSet>[] = text ? parseTeam(text) : [];
+
+// The human-facing paste page to link to (strip a trailing /raw or slash).
+const pasteUrl = src ? src.trim().replace(/\/+$/, '').replace(/\/raw$/i, '') : null;
+
+const cards = sets.map((set) => {
+  const rawSpecies = set.species ?? set.name ?? 'Unknown';
+  const { spriteSpecies, displayName, megaAbility } = resolveMega(rawSpecies, set.item);
+  // Nature stat effect: +10% one stat / -10% another (neutral natures = none).
+  const nat = set.nature ? Dex.natures.get(set.nature) : undefined;
+  const natureFx =
+    nat?.plus && nat?.minus
+      ? { plus: STAT_LABEL[nat.plus as keyof typeof STAT_LABEL], minus: STAT_LABEL[nat.minus as keyof typeof STAT_LABEL] }
+      : null;
+  return {
+    set,
+    species: displayName,
+    sprite: spriteFor(spriteSpecies),
+    itemIcon: itemSpriteFor(set.item),
+    // Only show the mega ability if it actually differs from the listed one.
+    megaAbility: megaAbility && megaAbility !== set.ability ? megaAbility : null,
+    natureFx,
+    evs: STAT_ORDER.map((k) => [k, set.evs?.[k] ?? 0] as const).filter(
+      ([, v]) => v > 0,
+    ),
+  };
+});
+---
+
+{
+  cards.length === 0 ? (
+    <p class="not-prose rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted">
+      {t('team.parseError')}
+    </p>
+  ) : (
+    <div class="not-prose">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {cards.map(({ set, species, sprite, itemIcon, megaAbility, natureFx, evs }) => (
+        <div class="flex gap-3 rounded-xl border border-border bg-surface p-3">
+          <div class="relative flex h-20 w-20 shrink-0 items-center justify-center">
+            <img
+              src={sprite.url}
+              alt={species}
+              loading="lazy"
+              class="max-h-20 max-w-20 object-contain"
+              style={`image-rendering: ${sprite.pixelated ? 'pixelated' : 'auto'}`}
+            />
+            {itemIcon &&
+              (itemIcon.url ? (
+                <img
+                  src={itemIcon.url}
+                  alt={set.item}
+                  title={set.item}
+                  loading="lazy"
+                  class="absolute -bottom-1 -right-1 h-8 w-8 object-contain drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+                />
+              ) : (
+                <span
+                  class="absolute bottom-0 right-0 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)]"
+                  style={itemIcon.style}
+                  title={set.item}
+                  aria-label={set.item}
+                />
+              ))}
+          </div>
+
+          <div class="min-w-0 flex-1 text-sm">
+            <div class="flex items-baseline justify-between gap-2">
+              <span class="truncate font-semibold text-fg">{species}</span>
+              {set.item && (
+                <span class="shrink-0 text-xs text-muted">@ {set.item}</span>
+              )}
+            </div>
+
+            {(set.ability || set.teraType) && (
+              <div class="mt-1 flex items-center justify-between gap-x-2 text-xs text-muted">
+                {set.ability && (
+                  <span class="min-w-0 truncate">
+                    {set.ability}
+                    {megaAbility && (
+                      <span class="text-accent"> ({megaAbility})</span>
+                    )}
+                  </span>
+                )}
+                {set.teraType && (
+                  <span class="shrink-0 text-accent" title={`Tera ${set.teraType}`}>
+                    {set.teraType}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {set.moves && set.moves.length > 0 && (
+              <ul class="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-fg/90">
+                {set.moves.map((move) => (
+                  <li class="truncate before:mr-1 before:text-accent before:content-['▸']">
+                    {move}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {(set.nature || evs.length > 0) && (
+              <div class="mt-2 space-y-0.5 text-[11px] text-muted">
+                {set.nature && (
+                  <div class="flex items-baseline gap-1.5">
+                    <span>{set.nature}</span>
+                    {natureFx && (
+                      <span class="font-semibold">
+                        <span class="text-green-400">+{natureFx.plus}</span>
+                        <span class="ml-1 text-red-400">−{natureFx.minus}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
+                {evs.length > 0 && (
+                  <div>{evs.map(([k, v]) => `${v} ${STAT_LABEL[k]}`).join(' / ')}</div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        ))}
+      </div>
+      {pasteUrl && (
+        <p class="mt-3 text-xs">
+          <a
+            href={pasteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-muted transition-colors hover:text-accent"
+          >
+            {t('team.viewPaste')}
+          </a>
+        </p>
+      )}
+    </div>
+  )
+}

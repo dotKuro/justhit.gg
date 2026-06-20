@@ -1,0 +1,94 @@
+Sprite normalization report
+===========================
+Species in @pkmn dex:          1416
+Mapped -> pokemon/*.gif:       1317
+new_megas best-guessed slugs:  0
+Species w/ no local gif (CDN): 98
+
+MUST-HAVE check: ALL PRESENT ✓
+
+--- new_megas best-guessed slugs (not yet on Showdown per @pkmn) ---
+  (none — all resolved canonically)
+
+--- species with no local gif (fall back to CDN) ---
+  venusaur-gmax
+  charizard-gmax
+  blastoise-gmax
+  butterfree-gmax
+  raticate-alolatotem
+  pikachu-cosplay
+  pikachu-rockstar
+  pikachu-belle
+  pikachu-popstar
+  pikachu-phd
+  pikachu-libre
+  pikachu-starter
+  pikachu-gmax
+  pikachu-world
+  meowth-gmax
+  machamp-gmax
+  gengar-gmax
+  kingler-gmax
+  marowak-alolatotem
+  lapras-gmax
+  eevee-starter
+  eevee-gmax
+  snorlax-gmax
+  pichu-spikyeared
+  unown
+  castform
+  burmy-sandy
+  darmanitan-galarzen
+  garbodor-gmax
+  greninja-bond
+  greninja-ash
+  meowstic-fmega
+  pumpkaboo-small
+  pumpkaboo-large
+  pumpkaboo-super
+  gourgeist-small
+  gourgeist-large
+  gourgeist-super
+  gumshoos-totem
+  vikavolt-totem
+  ribombee-totem
+  rockruff-dusk
+  araquanid-totem
+  lurantis-totem
+  salazzle-totem
+  togedemaru-totem
+  mimikyu-totem
+  mimikyu-bustedtotem
+  kommoo-totem
+  magearna-originalmega
+  melmetal-gmax
+  rillaboom-gmax
+  cinderace-gmax
+  inteleon-gmax
+  corviknight-gmax
+  orbeetle-gmax
+  drednaw-gmax
+  coalossal-gmax
+  flapple-gmax
+  appletun-gmax
+  sandaconda-gmax
+  toxtricity-gmax
+  centiskorch-gmax
+  sinistea-antique
+  polteageist-antique
+  hatterene-gmax
+  grimmsnarl-gmax
+  alcremie
+  alcremie-rubycream
+  alcremie-matchacream
+  alcremie-mintcream
+  alcremie-lemoncream
+  alcremie-rubyswirl
+  alcremie-caramelswirl
+  alcremie-rainbowswirl
+  alcremie-gmax
+  copperajah-gmax
+  duraludon-gmax
+  eternatus-eternamax
+  urshifu-gmax
+  ...and 18 more

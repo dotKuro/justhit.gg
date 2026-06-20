@@ -1,0 +1,64 @@
+---
+import '../styles/global.css';
+import LangSwitcher from '../components/LangSwitcher.astro';
+import ThemeToggle from '../components/ThemeToggle.astro';
+import { useTranslations, defaultLang, type Lang } from '../i18n/ui';
+
+interface Props {
+  title?: string;
+  description?: string;
+  lang?: Lang;
+}
+
+const {
+  title,
+  description,
+  lang = (Astro.currentLocale as Lang) ?? defaultLang,
+} = Astro.props;
+
+const t = useTranslations(lang);
+const desc = description ?? t('site.tagline');
+const pageTitle = title ? `${title} · justhit.gg` : 'justhit.gg';
+const year = new Date().getFullYear();
+---
+
+<!doctype html>
+<html lang={lang} class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {/* Set the theme before paint to avoid a flash. Defaults to dark unless a
+        stored choice or the OS preference says light. */}
+    <script is:inline>
+      (function () {
+        try {
+          var t = localStorage.getItem('theme');
+          var light = t ? t === 'light' : matchMedia('(prefers-color-scheme: light)').matches;
+          document.documentElement.classList.toggle('dark', !light);
+        } catch (e) {}
+      })();
+    </script>
+    <title>{pageTitle}</title>
+    <meta name="description" content={desc} />
+    <meta name="generator" content={Astro.generator} />
+  </head>
+  <body>
+    <div class="mx-auto flex min-h-dvh max-w-2xl flex-col px-5">
+      <header class="flex items-center justify-between border-b border-border py-6">
+        <a href={`/${lang}/`} class="text-lg font-bold tracking-tight">
+          just<span class="text-accent">hit</span><span class="text-muted">.gg</span>
+        </a>
+        <div class="flex items-center gap-1">
+          <ThemeToggle />
+          <LangSwitcher />
+        </div>
+      </header>
+      <main class="flex-1">
+        <slot />
+      </main>
+      <footer class="border-t border-border py-6 text-sm text-muted">
+        © {year} justhit.gg · {t('footer.text')}
+      </footer>
+    </div>
+  </body>
+</html>
