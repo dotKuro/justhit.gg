@@ -1,0 +1,69 @@
+# Cloud Build pipeline for justhit.gg.
+#
+# The sprites in public/sprites/ live in Git LFS, so a plain trigger checkout
+# only contains LFS *pointer* files (~130 bytes of text). Step 1 fetches the
+# real images; then we build, push, and deploy to Cloud Run.
+#
+# Point the trigger at this file:
+#   Trigger → Configuration → "Cloud Build configuration file"  → /cloudbuild.yaml
+#
+# Adjust the substitutions below if your service / region / Artifact Registry
+# repo differ from the Cloud Run defaults.
+
+substitutions:
+  _SERVICE: justhit-gg
+  _REGION: europe-west1
+  _REPO: cloud-run-source-deploy # Artifact Registry repo Cloud Run created
+
+steps:
+  # 1) Replace LFS pointer files with the real sprite images.
+  - id: lfs-pull
+    name: gcr.io/cloud-builders/git
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        if ! command -v git-lfs >/dev/null 2>&1; then
+          echo "git-lfs not present, installing..."
+          curl -sSL https://github.com/git-lfs/git-lfs/releases/download/v3.5.1/git-lfs-linux-amd64-v3.5.1.tar.gz | tar -xz -C /tmp
+          install /tmp/git-lfs-*/git-lfs /usr/local/bin/git-lfs
+        fi
+        git lfs install --local
+        git lfs pull
+        # A real webp is tens of KB; an unresolved pointer is ~130 bytes.
+        echo "Resolved sprite size:"; ls -l public/sprites/pokemon/mawile-mega.webp
+
+  # 2) Build the image — sprites are now real files in the build context.
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$COMMIT_SHA
+      - .
+
+  # 3) Push to Artifact Registry.
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$COMMIT_SHA
+
+  # 4) Deploy to Cloud Run (keeps the existing public/ingress settings).
+  - id: deploy
+    name: gcr.io/google.cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$COMMIT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --quiet
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1200s
