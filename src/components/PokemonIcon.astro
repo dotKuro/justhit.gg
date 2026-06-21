@@ -8,11 +8,18 @@ interface Props {
 
 const { species } = Astro.props;
 const icon = Icons.getPokemon(species);
+// Self-host the box-icon spritesheet. Showdown reorganizes its live sheet over
+// time (it shifted the Mega rows out from under @pkmn/img's baked offsets),
+// which silently breaks our icons. The local sheet matches the offsets we ship.
+const style = icon.style.replace(
+  'https://play.pokemonshowdown.com/sprites/pokemonicons-sheet.png',
+  '/sprites/pokemonicons-sheet.png',
+);
 ---
 
 <span
   class="not-prose mr-0.5 inline-block align-middle"
-  style={icon.style}
+  style={style}
   role="img"
   aria-label={species}
 ></span>
