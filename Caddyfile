@@ -13,8 +13,14 @@
 	# those and trailing-slash redirects automatically.
 	file_server
 
-	# Fingerprinted bundles and self-hosted sprites are content-addressed and
-	# never change — cache them hard. (HTML stays uncached by default.)
-	@immutable path /_astro/* /sprites/*
-	header @immutable Cache-Control "public, max-age=31536000, immutable"
+	# Fingerprinted bundles are content-addressed (the hash changes when the
+	# content does), so they can be cached forever.
+	@fingerprinted path /_astro/*
+	header @fingerprinted Cache-Control "public, max-age=31536000, immutable"
+
+	# Sprites/items live at stable URLs, so they must stay revalidatable —
+	# NOT immutable — or an updated sprite (or a bad deploy) gets stuck in
+	# browser caches. One day, then revalidate.
+	@sprites path /sprites/*
+	header @sprites Cache-Control "public, max-age=86400"
 }
