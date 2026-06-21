@@ -51,8 +51,11 @@ steps:
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$COMMIT_SHA
 
   # 4) Deploy to Cloud Run (keeps the existing public/ingress settings).
+  #    Use the gcloud builder from gcr.io/cloud-builders (same project as the
+  #    git/docker builders above) — the build's service account can pull it,
+  #    unlike gcr.io/google.cloudsdktool/cloud-sdk.
   - id: deploy
-    name: gcr.io/google.cloudsdktool/cloud-sdk
+    name: gcr.io/cloud-builders/gcloud
     entrypoint: gcloud
     args:
       - run
