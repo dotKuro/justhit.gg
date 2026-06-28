@@ -21,6 +21,12 @@ export const ui = {
     'type.report': 'Report',
     'type.article': 'Article',
     'nav.back': '← All posts',
+    'nav.teamPreview': 'Team preview',
+    'team.tool.title': 'Team preview',
+    'team.tool.intro': 'Paste a Poképaste link to see the whole team at a glance.',
+    'team.tool.placeholder': 'https://pokepast.es/…',
+    'team.tool.submit': 'Show team',
+    'team.tool.loading': 'Loading…',
     'report.fallback':
       'This report isn’t available in English yet. Showing the original version.',
     'article.fallback':
@@ -39,6 +45,12 @@ export const ui = {
     'type.report': 'Report',
     'type.article': 'Artikel',
     'nav.back': '← Alle Beiträge',
+    'nav.teamPreview': 'Team-Vorschau',
+    'team.tool.title': 'Team-Vorschau',
+    'team.tool.intro': 'Füge einen Poképaste-Link ein, um das ganze Team auf einen Blick zu sehen.',
+    'team.tool.placeholder': 'https://pokepast.es/…',
+    'team.tool.submit': 'Team anzeigen',
+    'team.tool.loading': 'Lädt…',
     'report.fallback':
       'Dieser Report ist noch nicht auf Deutsch verfügbar. Du siehst die englische Version.',
     'article.fallback':
