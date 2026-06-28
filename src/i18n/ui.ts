@@ -27,6 +27,12 @@ export const ui = {
     'team.tool.placeholder': 'https://pokepast.es/…',
     'team.tool.submit': 'Show team',
     'team.tool.loading': 'Loading…',
+    'team.tool.back': '← Back to team',
+    'team.field.item': 'Item',
+    'team.field.ability': 'Ability',
+    'team.field.tera': 'Tera',
+    'team.field.moves': 'Moves',
+    'team.field.spread': 'Spread',
     'report.fallback':
       'This report isn’t available in English yet. Showing the original version.',
     'article.fallback':
@@ -51,6 +57,12 @@ export const ui = {
     'team.tool.placeholder': 'https://pokepast.es/…',
     'team.tool.submit': 'Team anzeigen',
     'team.tool.loading': 'Lädt…',
+    'team.tool.back': '← Zurück zum Team',
+    'team.field.item': 'Item',
+    'team.field.ability': 'Fähigkeit',
+    'team.field.tera': 'Tera',
+    'team.field.moves': 'Attacken',
+    'team.field.spread': 'Spread',
     'report.fallback':
       'Dieser Report ist noch nicht auf Deutsch verfügbar. Du siehst die englische Version.',
     'article.fallback':

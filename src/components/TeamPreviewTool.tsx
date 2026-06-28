@@ -1,8 +1,9 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { PokemonSet } from '@pkmn/sets';
 import { Dex } from '@pkmn/dex';
 import { Sprites, Icons } from '@pkmn/img';
 import { fetchPaste, parseTeam, resolveMega } from '../lib/pokepaste';
+import { hostedSpriteUrl } from '../lib/sprites';
 import { useTranslations, type Lang } from '../i18n/ui';
 
 const STAT_ORDER = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const;
@@ -18,6 +19,7 @@ const STAT_LABEL: Record<(typeof STAT_ORDER)[number], string> = {
 type CardData = {
   set: Partial<PokemonSet>;
   species: string;
+  nickname: string | null;
   spriteSpecies: string;
   megaAbility: string | null;
   natureFx: { plus: string; minus: string } | null;
@@ -55,6 +57,9 @@ function buildCards(text: string): CardData[] {
     return {
       set,
       species: displayName,
+      // The Showdown export keeps a nickname in `name`; show it only when it
+      // actually differs from the species.
+      nickname: set.name && set.name !== set.species ? set.name : null,
       spriteSpecies,
       megaAbility: megaAbility && megaAbility !== set.ability ? megaAbility : null,
       natureFx,
@@ -64,17 +69,18 @@ function buildCards(text: string): CardData[] {
 }
 
 /** Local animated HOME render, falling back to the Showdown CDN sprite. */
-function Sprite({ species }: { species: string }) {
+function Sprite({ species, sizeClass = 'max-h-20 max-w-20' }: { species: string; sizeClass?: string }) {
   const cdn = Sprites.getPokemon(species);
   const id = decodeURIComponent(cdn.url.split('/').pop() ?? '').replace(/\.(gif|png|webp)$/i, '');
-  const [src, setSrc] = useState(id ? `/sprites/pokemon/${id}.webp` : cdn.url);
-  const [pixelated, setPixelated] = useState(id ? false : cdn.pixelated);
+  const hosted = hostedSpriteUrl(id);
+  const [src, setSrc] = useState(hosted ?? cdn.url);
+  const [pixelated, setPixelated] = useState(hosted ? false : cdn.pixelated);
   return (
     <img
       src={src}
       alt={species}
       loading="lazy"
-      className="max-h-20 max-w-20 object-contain"
+      className={`${sizeClass} object-contain`}
       style={{ imageRendering: pixelated ? 'pixelated' : 'auto' }}
       onError={() => {
         if (src !== cdn.url) {
@@ -87,7 +93,13 @@ function Sprite({ species }: { species: string }) {
 }
 
 /** Local Serebii item render, falling back to the Showdown sprite-sheet icon. */
-function ItemIcon({ item }: { item?: string }) {
+function ItemIcon({
+  item,
+  className = 'absolute -bottom-1 -right-1 h-8 w-8',
+}: {
+  item?: string;
+  className?: string;
+}) {
   const [failed, setFailed] = useState(false);
   if (!item) return null;
   const id = Dex.items.get(item).id || item.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -98,7 +110,7 @@ function ItemIcon({ item }: { item?: string }) {
         alt={item}
         title={item}
         loading="lazy"
-        className="absolute -bottom-1 -right-1 h-8 w-8 object-contain drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+        className={`${className} object-contain drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]`}
         onError={() => setFailed(true)}
       />
     );
@@ -124,24 +136,28 @@ export default function TeamPreviewTool({ lang }: { lang: Lang }) {
   const [input, setInput] = useState('');
   const [cards, setCards] = useState<CardData[] | null>(null);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
+  const [selected, setSelected] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  // The paste id currently held in `cards`, so back/forward between the grid and
+  // a single mon doesn't refetch the same team.
+  const loadedId = useRef<string | null>(null);
 
-  // Push the shown team into the URL (?paste=<id>) so it can be shared and the
-  // back/forward buttons step through previously viewed teams. Skip the push
-  // when nothing changed (e.g. resubmitting the same link).
+  // Push a fresh team into the URL (?paste=<id>) so it can be shared and the
+  // back/forward buttons step through previously viewed teams. Drops any stale
+  // ?mon and skips the push when nothing changed.
   function pushUrl(id: string | null) {
     const url = new URL(window.location.href);
     if (id) url.searchParams.set('paste', id);
     else url.searchParams.delete('paste');
-    if (url.searchParams.get('paste') !== new URL(window.location.href).searchParams.get('paste')) {
-      window.history.pushState(null, '', url);
-    }
+    url.searchParams.delete('mon');
+    if (url.href !== window.location.href) window.history.pushState(null, '', url);
   }
 
   async function show(raw: string, push = true) {
     const value = raw.trim();
     if (!value) return;
+    setInput(value);
     setLoading(true);
     setError(false);
 
@@ -158,22 +174,49 @@ export default function TeamPreviewTool({ lang }: { lang: Lang }) {
     }
     setCards(built);
     setSourceUrl(isUrl ? value.replace(/\/+$/, '').replace(/\/raw$/i, '') : null);
-    if (push) pushUrl(pasteIdFrom(value));
+    loadedId.current = pasteIdFrom(value);
+    // A new team from the form resets to the grid; loadFromLocation keeps the
+    // ?mon selection it set before calling us.
+    if (push) {
+      setSelected(null);
+      pushUrl(loadedId.current);
+    }
   }
 
-  // Render whatever ?paste=<id> the current URL points at, without pushing a new
-  // entry (the URL already reflects it). Used on load and on back/forward.
+  // Render whatever the current URL points at (?paste=<id>&mon=<index>) without
+  // pushing a new entry. Used on load and on back/forward.
   function loadFromLocation() {
-    const id = new URL(window.location.href).searchParams.get('paste');
-    if (id && /^[a-z0-9]+$/i.test(id)) {
-      const url = `https://pokepast.es/${id}`;
-      setInput(url);
-      show(url, false);
-    } else {
+    const url = new URL(window.location.href);
+    const id = url.searchParams.get('paste');
+    const monParam = url.searchParams.get('mon');
+    const monIdx = monParam && /^\d+$/.test(monParam) ? Number(monParam) : null;
+
+    if (!id || !/^[a-z0-9]+$/i.test(id)) {
       setCards(null);
       setSourceUrl(null);
       setError(false);
+      setSelected(null);
+      loadedId.current = null;
+      return;
     }
+
+    setSelected(monIdx);
+    // Same team already in memory: just switch grid <-> mon, no refetch.
+    if (loadedId.current !== id) show(`https://pokepast.es/${id}`, false);
+  }
+
+  function openMon(i: number) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('mon', String(i));
+    window.history.pushState(null, '', url);
+    setSelected(i);
+  }
+
+  function closeMon() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('mon');
+    window.history.pushState(null, '', url);
+    setSelected(null);
   }
 
   useEffect(() => {
@@ -182,6 +225,120 @@ export default function TeamPreviewTool({ lang }: { lang: Lang }) {
     return () => window.removeEventListener('popstate', loadFromLocation);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const mon = cards && selected !== null ? cards[selected] : null;
+
+  if (mon) {
+    return (
+      <div className="pb-16">
+        <button
+          type="button"
+          onClick={closeMon}
+          className="mt-6 text-sm text-muted transition-colors hover:text-fg"
+        >
+          {t('team.tool.back')}
+        </button>
+
+        <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-surface">
+          {/* Header: sprite + name with the key facts as a compact labelled list. */}
+          <div className="flex flex-col items-center gap-5 p-6 sm:flex-row sm:items-center sm:gap-6">
+            <div className="relative flex h-36 w-36 shrink-0 items-center justify-center rounded-xl bg-bg">
+              <Sprite species={mon.spriteSpecies} sizeClass="max-h-28 max-w-28" />
+              <ItemIcon item={mon.set.item} className="absolute bottom-1.5 right-1.5 h-11 w-11" />
+            </div>
+
+            <div className="min-w-0 flex-1 text-center sm:text-left">
+              <h2 className="text-3xl font-bold tracking-tight text-fg sm:text-4xl">
+                {mon.species}
+              </h2>
+              {mon.nickname && <p className="mt-1 text-base text-muted">{mon.nickname}</p>}
+
+              <dl className="mt-4 flex flex-wrap justify-center gap-x-8 gap-y-3 text-left sm:justify-start">
+                {mon.set.item && (
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted/70">
+                      {t('team.field.item')}
+                    </dt>
+                    <dd className="mt-0.5 text-base text-fg">{mon.set.item}</dd>
+                  </div>
+                )}
+                {mon.set.ability && (
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted/70">
+                      {t('team.field.ability')}
+                    </dt>
+                    <dd className="mt-0.5 text-base text-fg">
+                      {mon.set.ability}
+                      {mon.megaAbility && <span className="text-accent"> ({mon.megaAbility})</span>}
+                    </dd>
+                  </div>
+                )}
+                {mon.set.teraType && (
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted/70">
+                      {t('team.field.tera')}
+                    </dt>
+                    <dd className="mt-0.5 text-base font-medium text-accent">{mon.set.teraType}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          </div>
+
+          {/* Moves: full-width chips, two columns on wider screens. */}
+          {mon.set.moves && mon.set.moves.length > 0 && (
+            <div className="border-t border-border p-6 sm:p-7">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted/70">
+                {t('team.field.moves')}
+              </h3>
+              <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                {mon.set.moves.map((move, j) => (
+                  <div
+                    key={j}
+                    className="rounded-lg border border-border bg-bg px-4 py-3 text-base text-fg before:mr-2 before:text-accent before:content-['▸']"
+                  >
+                    {move}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Spread: nature + EVs, with the nature's boosted/cut stat coloured. */}
+          {(mon.set.nature || mon.evs.length > 0) && (
+            <div className="border-t border-border p-6 sm:p-7">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted/70">
+                {t('team.field.spread')}
+              </h3>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {mon.set.nature && (
+                  <span className="rounded-md bg-bg px-3 py-1.5 text-sm font-medium text-fg">
+                    {mon.set.nature}
+                  </span>
+                )}
+                {mon.evs.map(([k, v]) => {
+                  const label = STAT_LABEL[k];
+                  const up = mon.natureFx?.plus === label;
+                  const down = mon.natureFx?.minus === label;
+                  return (
+                    <span
+                      key={k}
+                      className="rounded-md bg-bg px-3 py-1.5 text-sm tabular-nums text-muted"
+                    >
+                      <span className="font-semibold text-fg">{v}</span>{' '}
+                      <span className={up ? 'text-green-400' : down ? 'text-red-400' : ''}>
+                        {label}
+                      </span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pb-16">
@@ -219,7 +376,12 @@ export default function TeamPreviewTool({ lang }: { lang: Lang }) {
         <div className="mt-6">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {cards.map(({ set, species, spriteSpecies, megaAbility, natureFx, evs }, i) => (
-              <div key={i} className="flex gap-3 rounded-xl border border-border bg-surface p-3">
+              <button
+                key={i}
+                type="button"
+                onClick={() => openMon(i)}
+                className="flex gap-3 rounded-xl border border-border bg-surface p-3 text-left transition-colors hover:border-accent"
+              >
                 <div className="relative flex h-20 w-20 shrink-0 items-center justify-center">
                   <Sprite species={spriteSpecies} />
                   <ItemIcon item={set.item} />
@@ -279,7 +441,7 @@ export default function TeamPreviewTool({ lang }: { lang: Lang }) {
                     </div>
                   )}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
 
