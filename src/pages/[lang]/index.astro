@@ -1,9 +1,10 @@
 ---
-import { getCollection, type CollectionEntry } from 'astro:content';
+import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PokemonIcon from '../../components/PokemonIcon.astro';
 import { teamIconSpecies } from '../../lib/pokepaste';
-import { useTranslations, dateLocale, languages, defaultLang, type Lang } from '../../i18n/ui';
+import { localizedEntries } from '../../lib/content';
+import { useTranslations, dateLocale, languages, type Lang } from '../../i18n/ui';
 
 export function getStaticPaths() {
   return (Object.keys(languages) as Lang[]).map((lang) => ({ params: { lang } }));
@@ -12,35 +13,57 @@ export function getStaticPaths() {
 const lang = Astro.params.lang as Lang;
 const t = useTranslations(lang);
 
-// Group reports by slug, preferring the current language, falling back to default.
-const all = await getCollection('reports');
-const bySlug = new Map<string, Partial<Record<Lang, CollectionEntry<'reports'>>>>();
-for (const entry of all) {
-  const [loc, ...rest] = entry.id.split('/');
-  const slug = rest.join('/');
-  if (!bySlug.has(slug)) bySlug.set(slug, {});
-  bySlug.get(slug)![loc as Lang] = entry;
-}
+type Card = {
+  kind: 'report' | 'article';
+  typeLabel: string;
+  href: string;
+  title: string;
+  description: string;
+  publishDate: Date;
+  species: string[];
+  tags: string[];
+};
 
-const reports = [...bySlug.entries()]
-  .map(([slug, locs]) => ({ slug, entry: locs[lang] ?? locs[defaultLang] }))
-  .filter((r): r is { slug: string; entry: CollectionEntry<'reports'> } => Boolean(r.entry))
-  .sort((a, b) => b.entry.data.publishDate.valueOf() - a.entry.data.publishDate.valueOf());
-
-// Resolve each report's headline team into a list of icon species (build-time).
-const cards = await Promise.all(
-  reports.map(async ({ slug, entry }) => ({
-    slug,
-    entry,
+// Reports: resolve each headline team into icon species (build-time).
+const reportCards: Card[] = await Promise.all(
+  localizedEntries(await getCollection('reports'), lang).map(async ({ slug, entry }) => ({
+    kind: 'report' as const,
+    typeLabel: t('type.report'),
+    href: `/${lang}/reports/${slug}/`,
+    title: entry.data.title,
+    description: entry.data.description,
+    publishDate: entry.data.publishDate,
     species: entry.data.paste ? await teamIconSpecies(entry.data.paste) : [],
+    tags: [entry.data.format, entry.data.tier, entry.data.placement, ...entry.data.tags].filter(
+      Boolean,
+    ) as string[],
   })),
+);
+
+// Articles: no team, just their own tags.
+const articleCards: Card[] = localizedEntries(await getCollection('articles'), lang).map(
+  ({ slug, entry }) => ({
+    kind: 'article' as const,
+    typeLabel: t('type.article'),
+    href: `/${lang}/articles/${slug}/`,
+    title: entry.data.title,
+    description: entry.data.description,
+    publishDate: entry.data.publishDate,
+    species: [],
+    tags: [...entry.data.tags],
+  }),
+);
+
+// One combined feed, newest first.
+const cards = [...reportCards, ...articleCards].sort(
+  (a, b) => b.publishDate.valueOf() - a.publishDate.valueOf(),
 );
 
 const fmtDate = (d: Date) =>
   d.toLocaleDateString(dateLocale[lang], { year: 'numeric', month: 'long', day: 'numeric' });
 
-const tagsOf = (e: CollectionEntry<'reports'>) =>
-  [e.data.format, e.data.tier, e.data.placement, ...e.data.tags].filter(Boolean) as string[];
+// Every chip on a card: the type label first (also a filter), then its tags.
+const chipsOf = (c: Card) => [c.typeLabel, ...c.tags];
 ---
 
 <BaseLayout lang={lang}>
@@ -58,23 +81,33 @@ const tagsOf = (e: CollectionEntry<'reports'>) =>
     ) : (
       <>
         <ul id="report-list" class="mt-4 grid gap-4 pb-2">
-          {cards.map(({ slug, entry, species }) => (
-            <li data-report data-tags={tagsOf(entry).join('|')}>
+          {cards.map((c) => (
+            <li data-report data-tags={chipsOf(c).join('|')}>
               <div class="rounded-xl border border-border bg-surface transition-colors hover:border-accent">
-                <a href={`/${lang}/reports/${slug}/`} class="block px-6 pt-5">
-                  {species.length > 0 && (
+                <a href={c.href} class="block px-6 pt-5">
+                  {c.species.length > 0 && (
                     <div class="mb-3 flex flex-wrap gap-0.5">
-                      {species.map((s) => (
+                      {c.species.map((s) => (
                         <PokemonIcon species={s} />
                       ))}
                     </div>
                   )}
-                  <p class="text-lg font-semibold">{entry.data.title}</p>
-                  <p class="mt-1 text-sm text-muted">{entry.data.description}</p>
-                  <p class="mt-3 text-xs text-muted/70">{fmtDate(entry.data.publishDate)}</p>
+                  <p class="text-lg font-semibold">{c.title}</p>
+                  <p class="mt-1 text-sm text-muted">{c.description}</p>
+                  <p class="mt-3 text-xs text-muted/70">{fmtDate(c.publishDate)}</p>
                 </a>
                 <div class="flex flex-wrap gap-2 px-6 pb-5 pt-3 text-xs">
-                  {tagsOf(entry).map((tag) => (
+                  {/* Type chip: visually distinct (accent dot), but filters like any tag. */}
+                  <button
+                    type="button"
+                    class="js-tag inline-flex cursor-pointer items-center gap-1 rounded-full border border-border px-2 py-0.5 font-semibold text-muted transition-colors hover:border-accent"
+                    data-tag={c.typeLabel}
+                    data-type-chip
+                  >
+                    <span class="js-dot relative top-[0.5px] size-1.5 rounded-full bg-accent" />
+                    {c.typeLabel}
+                  </button>
+                  {c.tags.map((tag) => (
                     <button
                       type="button"
                       class="js-tag cursor-pointer rounded-full border border-border px-2 py-0.5 font-medium text-muted transition-colors hover:border-accent"
@@ -103,6 +136,11 @@ const tagsOf = (e: CollectionEntry<'reports'>) =>
   const active = document.getElementById('active-filters');
   const noMatch = document.getElementById('no-match');
 
+  // Tags rendered with a leading dot (the Report/Article type chips).
+  const dotTags = new Set(
+    [...document.querySelectorAll<HTMLElement>('[data-type-chip]')].map((b) => b.dataset.tag || ''),
+  );
+
   const ACTIVE = ['border-accent', 'bg-accent', 'text-bg'];
   const INACTIVE = ['border-border', 'text-muted', 'hover:border-accent'];
 
@@ -114,6 +152,13 @@ const tagsOf = (e: CollectionEntry<'reports'>) =>
     } else {
       el.classList.add(...INACTIVE);
       el.classList.remove(...ACTIVE);
+    }
+    // Invert the dot to the background colour so it stays visible on the
+    // accent-filled chip while selected.
+    const dot = el.querySelector('.js-dot');
+    if (dot) {
+      dot.classList.toggle('bg-bg', on);
+      dot.classList.toggle('bg-accent', !on);
     }
   }
 
@@ -138,8 +183,14 @@ const tagsOf = (e: CollectionEntry<'reports'>) =>
         const chip = document.createElement('button');
         chip.type = 'button';
         chip.className =
-          'cursor-pointer rounded-full border border-accent bg-accent px-1.5 py-0.5 font-medium text-bg';
-        chip.textContent = `${f} ✕`;
+          'inline-flex cursor-pointer items-center gap-1 rounded-full border border-accent bg-accent px-1.5 py-0.5 font-medium text-bg';
+        // Mirror the type chips: a leading dot, inverted to the background colour.
+        if (dotTags.has(f)) {
+          const dot = document.createElement('span');
+          dot.className = 'relative top-[0.5px] size-1.5 rounded-full bg-bg';
+          chip.appendChild(dot);
+        }
+        chip.appendChild(document.createTextNode(`${f} ✕`));
         chip.addEventListener('click', () => toggle(f));
         active.appendChild(chip);
       }
@@ -168,7 +219,7 @@ const tagsOf = (e: CollectionEntry<'reports'>) =>
   }
 
   // Initialise from the URL on load. Unknown tags are kept too, so they show as
-  // a removable chip and surface the "no reports match" state.
+  // a removable chip and surface the "no posts match" state.
   for (const tag of new URL(window.location.href).searchParams.getAll('tag')) {
     if (tag) filters.add(tag);
   }
