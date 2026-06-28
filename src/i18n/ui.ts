@@ -15,12 +15,23 @@ export const dateLocale: Record<Lang, string> = {
 export const ui = {
   en: {
     'site.tagline': 'Documenting my competitive Pokémon journey',
-    'home.latest': 'Latest reports',
-    'home.empty': 'No reports yet. Coming soon.',
-    'home.noMatch': 'No reports match these filters.',
-    'report.back': '← All reports',
+    'home.latest': 'Latest posts',
+    'home.empty': 'No posts yet. Coming soon.',
+    'home.noMatch': 'No posts match these filters.',
+    'type.report': 'Report',
+    'type.article': 'Article',
+    'nav.back': '← All posts',
+    'nav.teamPreview': 'Team preview',
+    'team.tool.title': 'Team preview',
+    'team.tool.intro': 'Paste a Poképaste link to see the whole team at a glance.',
+    'team.tool.placeholder': 'https://pokepast.es/…',
+    'team.tool.submit': 'Show team',
+    'team.tool.loading': 'Loading…',
     'report.fallback':
       'This report isn’t available in English yet. Showing the original version.',
+    'article.fallback':
+      'This article isn’t available in English yet. Showing the original version.',
+    'article.viewTool': 'Open the tool →',
     'footer.text': 'my competitive Pokémon journey',
     'team.viewPaste': 'View full paste on Poképaste →',
     'team.parseError':
@@ -28,12 +39,23 @@ export const ui = {
   },
   de: {
     'site.tagline': 'Mein Weg durch die kompetitive Pokémon-Welt',
-    'home.latest': 'Neueste Reports',
-    'home.empty': 'Noch keine Reports. Kommt bald.',
-    'home.noMatch': 'Keine Reports passen zu diesen Filtern.',
-    'report.back': '← Alle Reports',
+    'home.latest': 'Neueste Beiträge',
+    'home.empty': 'Noch keine Beiträge. Kommt bald.',
+    'home.noMatch': 'Keine Beiträge passen zu diesen Filtern.',
+    'type.report': 'Report',
+    'type.article': 'Artikel',
+    'nav.back': '← Alle Beiträge',
+    'nav.teamPreview': 'Team-Vorschau',
+    'team.tool.title': 'Team-Vorschau',
+    'team.tool.intro': 'Füge einen Poképaste-Link ein, um das ganze Team auf einen Blick zu sehen.',
+    'team.tool.placeholder': 'https://pokepast.es/…',
+    'team.tool.submit': 'Team anzeigen',
+    'team.tool.loading': 'Lädt…',
     'report.fallback':
       'Dieser Report ist noch nicht auf Deutsch verfügbar. Du siehst die englische Version.',
+    'article.fallback':
+      'Dieser Artikel ist noch nicht auf Deutsch verfügbar. Du siehst die englische Version.',
+    'article.viewTool': 'Tool öffnen →',
     'footer.text': 'meine kompetitive Pokémon-Reise',
     'team.viewPaste': 'Vollständige Paste auf Poképaste ansehen →',
     'team.parseError':

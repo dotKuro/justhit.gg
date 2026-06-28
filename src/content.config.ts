@@ -22,4 +22,19 @@ const reports = defineCollection({
   }),
 });
 
-export const collections = { reports };
+const articles = defineCollection({
+  loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/articles' }),
+  schema: z.object({
+    title: z.string(),
+    description: z.string(),
+    publishDate: z.coerce.date(),
+    /** Free-form labels. Shown as filterable chips, like on reports. */
+    tags: z.array(z.string()).default([]),
+    /** Optional external link, e.g. the tool this article announces. */
+    link: z.string().optional(),
+    /** Label for that link; falls back to a generic UI string. */
+    linkLabel: z.string().optional(),
+  }),
+});
+
+export const collections = { reports, articles };

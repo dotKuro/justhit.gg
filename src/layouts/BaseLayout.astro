@@ -45,9 +45,17 @@ const year = new Date().getFullYear();
   <body>
     <div class="mx-auto flex min-h-dvh max-w-2xl flex-col px-5">
       <header class="flex items-center justify-between border-b border-border py-6">
-        <a href={`/${lang}/`} class="text-lg font-bold tracking-tight">
-          just<span class="text-accent">hit</span><span class="text-muted">.gg</span>
-        </a>
+        <div class="flex items-baseline gap-4">
+          <a href={`/${lang}/`} class="text-lg font-bold tracking-tight">
+            just<span class="text-accent">hit</span><span class="text-muted">.gg</span>
+          </a>
+          <a
+            href={`/${lang}/team/`}
+            class="text-sm text-muted transition-colors hover:text-fg"
+          >
+            {t('nav.teamPreview')}
+          </a>
+        </div>
         <div class="flex items-center gap-1">
           <ThemeToggle />
           <LangSwitcher />
