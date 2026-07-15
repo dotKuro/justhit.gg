@@ -1,5 +1,7 @@
-// Optimize the renamed HOME gifs into small animated WebP for the web.
+// Optimize the renamed HOME gifs into small animated WebP for the web, plus a
+// best-quality still PNG per sprite.
 //   public/sprites/pokemon/<id>.gif  ->  public/sprites/pokemon/<id>.webp
+//                                        public/sprites/pokemon/<id>.png
 //
 // Per sprite:
 //   1. ffmpeg drops the frame rate to 15fps at full resolution (the fps filter
@@ -10,6 +12,10 @@
 //      gif blends the transparent-but-white source into the edges and bakes in
 //      a white halo. sharp also sets frame disposal correctly (no ghosting),
 //      unlike ffmpeg's `-c:v libwebp`.
+//   3. sharp writes the first frame of the ORIGINAL gif (no fps drop, no
+//      resize) as a lossless full-resolution PNG — the best still the gif
+//      source can yield. PNG has no animation, and a lossless animated recode
+//      of a gif can't beat the gif itself, so stills are the PNG's job.
 //
 // Also writes src/data/pokemon-sprites.json (the ids we host) for the site.
 // Run AFTER build-sprites.mjs. The webps are uploaded to the bucket separately
@@ -41,6 +47,7 @@ let done = 0;
 let failed = 0;
 let bytesIn = 0;
 let bytesOut = 0;
+let bytesPng = 0;
 const errors = [];
 
 const ffmpeg = (args) =>
@@ -54,8 +61,12 @@ const ffmpeg = (args) =>
 async function convert(file, i) {
   const src = path.join(DIR, file);
   const out = path.join(DIR, file.replace(/\.gif$/i, '.webp'));
+  const outPng = path.join(DIR, file.replace(/\.gif$/i, '.png'));
   const tmp = path.join(os.tmpdir(), `jh-sprite-${process.pid}-${i}.gif`);
   try {
+    // Best-quality still: first frame of the untouched source, full res,
+    // lossless. Must happen before --clean deletes the gif.
+    await sharp(src).png({ compressionLevel: 9 }).toFile(outPng);
     // Drop fps at full resolution; palettegen/paletteuse with reserve_transparent
     // keeps transparency through the gif intermediate. We deliberately do NOT
     // scale here — sharp does the resize so alpha edges stay clean (see header).
@@ -73,6 +84,7 @@ async function convert(file, i) {
       .toFile(out);
     bytesIn += fs.statSync(src).size;
     bytesOut += fs.statSync(out).size;
+    bytesPng += fs.statSync(outPng).size;
     if (CLEAN) fs.rmSync(src);
   } catch (e) {
     failed++;
@@ -97,7 +109,7 @@ async function run() {
 }
 
 const mb = (n) => (n / 1024 / 1024).toFixed(1) + ' MB';
-console.log(`Optimizing ${gifs.length} gifs -> webp (${MAX_DIM}px, ${FPS}fps, q${QUALITY}, ${CONCURRENCY} workers)...`);
+console.log(`Optimizing ${gifs.length} gifs -> webp (${MAX_DIM}px, ${FPS}fps, q${QUALITY}) + lossless full-res png (${CONCURRENCY} workers)...`);
 const t0 = Date.now();
 await run();
 
@@ -116,6 +128,7 @@ console.log(`  manifest:  ${path.relative(process.cwd(), MANIFEST)} (${hostedIds
 console.log(`  converted: ${gifs.length - failed}/${gifs.length}`);
 console.log(`  size:      ${mb(bytesIn)} -> ${mb(bytesOut)}  (${(100 - (bytesOut / bytesIn) * 100).toFixed(1)}% smaller)`);
 console.log(`  avg webp:  ${(bytesOut / (gifs.length - failed) / 1024).toFixed(1)} KB`);
+console.log(`  pngs:      ${mb(bytesPng)} total, avg ${(bytesPng / (gifs.length - failed) / 1024).toFixed(1)} KB`);
 if (CLEAN) console.log(`  source gifs deleted (--clean)`);
 if (errors.length) {
   console.log(`\n  ${errors.length} failures:`);
