@@ -31,8 +31,8 @@ steps:
         fi
         git lfs install --local
         git lfs pull
-        # A real webp is tens of KB; an unresolved pointer is ~130 bytes.
-        echo "Resolved sprite size:"; ls -l public/sprites/pokemon/mawile-mega.webp
+        # A real png is hundreds of KB; an unresolved pointer is ~130 bytes.
+        echo "Resolved sprite size:"; ls -l public/sprites/pokemonicons-sheet.png
 
   # 2) Build the image — sprites are now real files in the build context.
   - id: build

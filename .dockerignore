@@ -3,8 +3,9 @@
 # site (the optimized sprites already live in public/sprites/).
 sprite-source
 
-# Pokémon webps are served from the GCS bucket, not the image.
+# Pokémon webps and item renders are served from the GCS bucket, not the image.
 public/sprites/pokemon
+public/sprites/items
 
 node_modules
 dist

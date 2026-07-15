@@ -2,11 +2,9 @@
 import { type PokemonSet } from '@pkmn/sets';
 import { Sprites, Icons } from '@pkmn/img';
 import { Dex } from '@pkmn/dex';
-import fs from 'node:fs';
-import path from 'node:path';
 import { useTranslations, defaultLang, type Lang } from '../i18n/ui';
 import { fetchPaste, parseTeam, resolveMega } from '../lib/pokepaste';
-import { hostedSpriteUrl } from '../lib/sprites';
+import { hostedSpriteUrl, hostedItemUrl } from '../lib/sprites';
 
 const t = useTranslations((Astro.currentLocale as Lang) ?? defaultLang);
 
@@ -29,18 +27,16 @@ function spriteFor(species: string) {
   };
 }
 
-const LOCAL_ITEM_DIR = 'public/sprites/items';
-
 /**
- * Prefer our local non-pixelated Serebii item render; fall back to the Showdown
- * pixel-sheet icon (returned as an inline style) for anything we don't have.
+ * Prefer our self-hosted non-pixelated Serebii item render (bucket); fall back
+ * to the Showdown pixel-sheet icon (returned as an inline style) for anything
+ * we don't have.
  */
 function itemSpriteFor(item?: string) {
   if (!item) return null;
   const id = Dex.items.get(item).id || item.toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (id && fs.existsSync(path.resolve(LOCAL_ITEM_DIR, `${id}.png`))) {
-    return { url: `/sprites/items/${id}.png`, style: null };
-  }
+  const hosted = hostedItemUrl(id);
+  if (hosted) return { url: hosted, style: null };
   return { url: null, style: Icons.getItem(item).style };
 }
 

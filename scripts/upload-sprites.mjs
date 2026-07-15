@@ -1,5 +1,6 @@
-// Mirror the optimized Pokémon webps to the public GCS bucket. Run after
-// optimize-sprites.mjs, before deploying.
+// Mirror the optimized Pokémon sprites (animated webps + lossless still pngs)
+// and the Serebii item renders to the public GCS bucket. Run after
+// optimize-sprites.mjs / fetch-items.mjs, before deploying.
 //
 //   node scripts/upload-sprites.mjs
 //
@@ -13,25 +14,38 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 
-const SRC = 'public/sprites/pokemon';
-const DEST = process.env.SPRITE_BUCKET ?? 'gs://justhit-sprites/pokemon';
+const BUCKET = process.env.SPRITE_BUCKET ?? 'gs://justhit-sprites';
+const SYNCS = [
+  { src: 'public/sprites/pokemon', dest: `${BUCKET}/pokemon`, ext: '.webp', label: 'webps' },
+  { src: 'public/sprites/items', dest: `${BUCKET}/items`, ext: '.png', label: 'pngs' },
+];
 
-const count = fs.existsSync(SRC)
-  ? fs.readdirSync(SRC).filter((f) => f.toLowerCase().endsWith('.webp')).length
-  : 0;
-if (count === 0) {
-  console.error(`No webps in ${SRC}. Run build-sprites.mjs + optimize-sprites.mjs first.`);
-  process.exit(1);
+const rsync = ({ src, dest }) =>
+  new Promise((resolve) => {
+    const p = spawn(
+      'gsutil',
+      ['-m', '-h', 'Cache-Control:public, max-age=86400', 'rsync', '-r', '-d', src, dest],
+      { stdio: 'inherit' },
+    );
+    p.on('error', (e) => {
+      console.error(`Failed to launch gsutil (${e.message}). Is the gcloud SDK installed and on PATH?`);
+      resolve(1);
+    });
+    p.on('close', (c) => resolve(c ?? 0));
+  });
+
+let exitCode = 0;
+for (const sync of SYNCS) {
+  const count = fs.existsSync(sync.src)
+    ? fs.readdirSync(sync.src).filter((f) => f.toLowerCase().endsWith(sync.ext)).length
+    : 0;
+  if (count === 0) {
+    console.error(`No ${sync.label} in ${sync.src}. Run the build/fetch scripts first.`);
+    exitCode = 1;
+    continue;
+  }
+  console.log(`Uploading ${count} ${sync.label}: ${sync.src} -> ${sync.dest}`);
+  const c = await rsync(sync);
+  if (c !== 0) exitCode = c;
 }
-
-console.log(`Uploading ${count} sprites: ${SRC} -> ${DEST}`);
-const p = spawn(
-  'gsutil',
-  ['-m', '-h', 'Cache-Control:public, max-age=86400', 'rsync', '-r', '-d', SRC, DEST],
-  { stdio: 'inherit' },
-);
-p.on('error', (e) => {
-  console.error(`Failed to launch gsutil (${e.message}). Is the gcloud SDK installed and on PATH?`);
-  process.exit(1);
-});
-p.on('close', (c) => process.exit(c ?? 0));
+process.exit(exitCode);

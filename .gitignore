@@ -8,10 +8,12 @@ dist/
 # Raw sprite-pipeline input (5.7 GB — never commit; rebuilt via scripts/).
 sprite-source/
 
-# Animated Pokémon webps are hosted on the GCS bucket, not committed. They are
-# generated locally by scripts/optimize-sprites.mjs and pushed with
-# scripts/upload-sprites.mjs. Item icons + the box-icon sheet stay tracked.
+# Animated Pokémon webps and Serebii item renders are hosted on the GCS
+# bucket, not committed. They are generated locally by
+# scripts/optimize-sprites.mjs / scripts/fetch-items.mjs and pushed with
+# scripts/upload-sprites.mjs. Only the box-icon sheet stays tracked.
 public/sprites/pokemon/
+public/sprites/items/
 
 # Logs and OS cruft
 *.log

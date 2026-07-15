@@ -3,7 +3,7 @@ import type { PokemonSet } from '@pkmn/sets';
 import { Dex } from '@pkmn/dex';
 import { Sprites, Icons } from '@pkmn/img';
 import { fetchPaste, parseTeam, resolveMega } from '../lib/pokepaste';
-import { hostedSpriteUrl } from '../lib/sprites';
+import { hostedSpriteUrl, hostedItemUrl } from '../lib/sprites';
 import { useTranslations, type Lang } from '../i18n/ui';
 
 const STAT_ORDER = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const;
@@ -92,7 +92,7 @@ function Sprite({ species, sizeClass = 'max-h-20 max-w-20' }: { species: string;
   );
 }
 
-/** Local Serebii item render, falling back to the Showdown sprite-sheet icon. */
+/** Self-hosted Serebii item render, falling back to the Showdown sprite-sheet icon. */
 function ItemIcon({
   item,
   className = 'absolute -bottom-1 -right-1 h-8 w-8',
@@ -103,10 +103,11 @@ function ItemIcon({
   const [failed, setFailed] = useState(false);
   if (!item) return null;
   const id = Dex.items.get(item).id || item.toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (!failed && id) {
+  const hosted = hostedItemUrl(id);
+  if (!failed && hosted) {
     return (
       <img
-        src={`/sprites/items/${id}.png`}
+        src={hosted}
         alt={item}
         title={item}
         loading="lazy"
