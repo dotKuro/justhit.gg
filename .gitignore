@@ -15,6 +15,9 @@ sprite-source/
 public/sprites/pokemon/
 public/sprites/items/
 
+# One-off exports (e.g. scripts/export-pixel-icons.mjs)
+exports/
+
 # Logs and OS cruft
 *.log
 .DS_Store

@@ -18,13 +18,32 @@ const BUCKET = process.env.SPRITE_BUCKET ?? 'gs://justhit-sprites';
 const SYNCS = [
   { src: 'public/sprites/pokemon', dest: `${BUCKET}/pokemon`, ext: '.webp', label: 'webps' },
   { src: 'public/sprites/items', dest: `${BUCKET}/items`, ext: '.png', label: 'pngs' },
+  // Pre-sliced 40x30 box icons (scripts/export-pixel-icons.mjs), named like
+  // the webps. The exclude keeps the export's REPORT.txt out of the bucket.
+  {
+    src: 'exports/pixel-sprites',
+    dest: `${BUCKET}/pokemon-pixel`,
+    ext: '.png',
+    label: 'pixel icons',
+    exclude: 'REPORT\\.txt$',
+  },
 ];
 
-const rsync = ({ src, dest }) =>
+const rsync = ({ src, dest, exclude }) =>
   new Promise((resolve) => {
     const p = spawn(
       'gsutil',
-      ['-m', '-h', 'Cache-Control:public, max-age=86400', 'rsync', '-r', '-d', src, dest],
+      [
+        '-m',
+        '-h',
+        'Cache-Control:public, max-age=86400',
+        'rsync',
+        '-r',
+        '-d',
+        ...(exclude ? ['-x', exclude] : []),
+        src,
+        dest,
+      ],
       { stdio: 'inherit' },
     );
     p.on('error', (e) => {
